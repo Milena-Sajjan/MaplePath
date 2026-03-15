@@ -1,0 +1,16 @@
+{
+  "name": "MaplePath",
+  "short_name": "MaplePath",
+  "description": "Your guide to settling in Canada",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#F8F6F2",
+  "theme_color": "#1A3A2A",
+  "icons": [
+    {
+      "src": "/maple-leaf.svg",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    }
+  ]
+}
