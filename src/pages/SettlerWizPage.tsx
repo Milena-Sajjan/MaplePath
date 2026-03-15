@@ -191,6 +191,12 @@ export default function SettlerWizPage() {
   );
 
   const handleClearConversation = async () => {
+    if (isDemoMode) {
+      setMessages([]);
+      setError(null);
+      return;
+    }
+
     if (!user) return;
 
     try {
