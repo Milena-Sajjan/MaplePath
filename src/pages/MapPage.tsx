@@ -15,7 +15,8 @@ import {
   AlertCircle,
 } from 'lucide-react';
 import mapboxgl from 'mapbox-gl';
-import { supabase } from '../lib/supabase';
+import { supabase, isDemoMode } from '../lib/supabase';
+import { demoMapPins } from '../lib/demoData';
 import { useAuthStore } from '../store/authStore';
 
 const categoryColors: Record<string, string> = {
@@ -65,8 +66,15 @@ interface AddPinForm {
 }
 
 const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_TOKEN as string;
+const hasMapboxToken = import.meta.env.VITE_MAPBOX_TOKEN && import.meta.env.VITE_MAPBOX_TOKEN !== 'your_mapbox_public_token';
 const OTTAWA_CENTER: [number, number] = [-75.6972, 45.4215];
 const DEFAULT_ZOOM = 13;
+
+const demoNearbyUsers: NearbyUser[] = [
+  { id: 'demo-u1', full_name: 'Amina Hassan', avatar_url: null, country_of_origin: 'Somalia', university: 'University of Ottawa' },
+  { id: 'demo-u2', full_name: 'Wei Chen', avatar_url: null, country_of_origin: 'China', university: 'Carleton University' },
+  { id: 'demo-u3', full_name: 'Priya Sharma', avatar_url: null, country_of_origin: 'India', university: 'Algonquin College' },
+];
 
 export default function MapPage() {
   const { t } = useTranslation();
@@ -98,6 +106,14 @@ export default function MapPage() {
   const fetchPins = useCallback(async () => {
     setLoading(true);
     setError(null);
+
+    if (isDemoMode) {
+      setPins(demoMapPins as MapPinData[]);
+      setNearbyUsers(demoNearbyUsers);
+      setLoading(false);
+      return;
+    }
+
     try {
       const { data, error: fetchError } = await supabase
         .from('map_pins')
@@ -158,6 +174,11 @@ export default function MapPage() {
   );
 
   const fetchNearbyUsers = useCallback(async (bounds: mapboxgl.LngLatBounds) => {
+    if (isDemoMode) {
+      setNearbyUsers(demoNearbyUsers);
+      return;
+    }
+
     try {
       const sw = bounds.getSouthWest();
       const ne = bounds.getNorthEast();
@@ -190,7 +211,7 @@ export default function MapPage() {
   }, []);
 
   useEffect(() => {
-    if (!mapContainerRef.current || !MAPBOX_TOKEN) return;
+    if (!mapContainerRef.current || !hasMapboxToken) return;
 
     mapboxgl.accessToken = MAPBOX_TOKEN;
 
@@ -393,6 +414,8 @@ export default function MapPage() {
     const countEl = document.getElementById(`upvote-count-${pinId}`);
     if (countEl) countEl.textContent = String(newUpvotes);
 
+    if (isDemoMode) return;
+
     try {
       const { error: updateErr } = await supabase
         .from('map_pins')
@@ -434,6 +457,31 @@ export default function MapPage() {
     const longitude = addForm.longitude ?? OTTAWA_CENTER[0];
 
     setSubmitting(true);
+
+    if (isDemoMode) {
+      const newPin: MapPinData = {
+        id: `demo-pin-${Date.now()}`,
+        title: addForm.title.trim(),
+        category: addForm.category,
+        description: addForm.description.trim() || null,
+        address: addForm.address.trim() || null,
+        hours: null,
+        latitude,
+        longitude,
+        upvotes: 0,
+        user_id: user.id,
+        created_at: new Date().toISOString(),
+      };
+      setPins((prev) => [...prev, newPin]);
+      setAddForm({ title: '', category: 'food', description: '', address: '', latitude: null, longitude: null });
+      setShowAddModal(false);
+      setSubmitting(false);
+      if (mapRef.current) {
+        mapRef.current.flyTo({ center: [longitude, latitude], zoom: 15 });
+      }
+      return;
+    }
+
     try {
       const { data, error: insertErr } = await supabase
         .from('map_pins')
@@ -560,7 +608,15 @@ export default function MapPage() {
       </div>
 
       {/* Map container */}
-      <div ref={mapContainerRef} className="h-full w-full" />
+      {hasMapboxToken ? (
+        <div ref={mapContainerRef} className="h-full w-full" />
+      ) : (
+        <div className="flex h-full w-full flex-col items-center justify-center bg-gradient-to-br from-green-50 to-blue-50">
+          <MapPin className="mb-4 h-16 w-16 text-gray-300" />
+          <p className="text-lg font-medium text-gray-500">Map requires a Mapbox token</p>
+          <p className="mt-1 text-sm text-gray-400">Add VITE_MAPBOX_TOKEN to your environment to enable the interactive map</p>
+        </div>
+      )}
 
       {/* Legend */}
       <div className="absolute bottom-4 left-4 z-10 rounded-lg bg-white/90 p-3 shadow-md backdrop-blur-sm">

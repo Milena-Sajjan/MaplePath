@@ -2,6 +2,7 @@ import { Suspense, lazy, useEffect } from 'react'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { useAuthStore } from './store/authStore'
 import { useProfileStore } from './store/profileStore'
+import { isDemoMode } from './lib/supabase'
 
 const AppLayout = lazy(() => import('./components/layout/AppLayout'))
 const LoginPage = lazy(() => import('./pages/auth/LoginPage'))
@@ -37,6 +38,10 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { profile } = useProfileStore()
 
   if (loading) return <LoadingScreen />
+
+  // In demo mode, always allow access
+  if (isDemoMode) return <>{children}</>
+
   if (!user) return <Navigate to="/login" replace />
   if (user && profile && !profile.onboarding_complete) {
     return <Navigate to="/onboarding" replace />
@@ -55,8 +60,15 @@ export default function App() {
     <BrowserRouter>
       <Suspense fallback={<LoadingScreen />}>
         <Routes>
-          <Route path="/login" element={<LoginPage />} />
-          <Route path="/signup" element={<SignupPage />} />
+          {/* In demo mode, redirect login/signup to dashboard */}
+          <Route
+            path="/login"
+            element={isDemoMode ? <Navigate to="/" replace /> : <LoginPage />}
+          />
+          <Route
+            path="/signup"
+            element={isDemoMode ? <Navigate to="/" replace /> : <SignupPage />}
+          />
           <Route path="/onboarding" element={<OnboardingPage />} />
           <Route
             path="/"

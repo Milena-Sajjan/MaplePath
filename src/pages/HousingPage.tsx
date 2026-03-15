@@ -5,7 +5,8 @@ import {
   Search, Home, DollarSign, BedDouble, Bath, MapPin, Plus, X,
   Filter, Calendar, Wifi, Car, Dog, Users, Eye, MessageSquare
 } from 'lucide-react';
-import { supabase } from '../lib/supabase';
+import { supabase, isDemoMode } from '../lib/supabase';
+import { demoHousing } from '../lib/demoData';
 import { useAuthStore } from '../store/authStore';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
@@ -88,6 +89,21 @@ export default function HousingPage() {
   const fetchListings = useCallback(async () => {
     setLoading(true);
     try {
+      if (isDemoMode) {
+        let filtered = demoHousing as unknown as Listing[];
+        if (filters.type !== 'All') filtered = filtered.filter(l => l.listing_type.toLowerCase() === filters.type.toLowerCase());
+        if (filters.minPrice) filtered = filtered.filter(l => l.price_monthly >= Number(filters.minPrice));
+        if (filters.maxPrice) filtered = filtered.filter(l => l.price_monthly <= Number(filters.maxPrice));
+        if (filters.furnished) filtered = filtered.filter(l => l.furnished);
+        if (filters.utilities) filtered = filtered.filter(l => l.utilities);
+        if (filters.pets) filtered = filtered.filter(l => l.pets_allowed);
+        if (filters.studentOnly) filtered = filtered.filter(l => l.student_only);
+        if (filters.search) filtered = filtered.filter(l => l.title.toLowerCase().includes(filters.search.toLowerCase()));
+        setListings(filtered);
+        setLoading(false);
+        return;
+      }
+
       let query = supabase
         .from('housing_listings')
         .select('*, profiles(full_name, country, university, languages)')
@@ -154,6 +170,42 @@ export default function HousingPage() {
     if (!user || submitting) return;
     setSubmitting(true);
     try {
+      if (isDemoMode) {
+        const newListing: Listing = {
+          id: `h-${Date.now()}`,
+          user_id: user.id,
+          title: form.title,
+          listing_type: form.type,
+          price_monthly: Number(form.price),
+          bedrooms: Number(form.bedrooms),
+          bathrooms: Number(form.bathrooms),
+          description: form.description,
+          address: form.address,
+          city: '',
+          latitude: null,
+          longitude: null,
+          available_from: form.available_from || '',
+          amenities: form.amenities,
+          furnished: form.furnished,
+          utilities: form.utilities_included,
+          pets_allowed: form.pets_allowed,
+          student_only: form.student_only,
+          gender_pref: form.gender_preference,
+          images: [],
+          created_at: new Date().toISOString(),
+        };
+        setListings(prev => [newListing, ...prev]);
+        setShowPostModal(false);
+        setForm({
+          title: '', type: 'Room', price: '', bedrooms: '1', bathrooms: '1',
+          description: '', address: '', available_from: '',
+          amenities: [], furnished: false, utilities_included: false,
+          pets_allowed: false, student_only: false, gender_preference: 'No preference',
+        });
+        setSubmitting(false);
+        return;
+      }
+
       const { error } = await supabase.from('housing_listings').insert({
         user_id: user.id,
         title: form.title,
@@ -193,6 +245,13 @@ export default function HousingPage() {
     if (!user || contactSending) return;
     setContactSending(true);
     try {
+      if (isDemoMode) {
+        // In demo mode, just simulate a successful inquiry
+        await new Promise(resolve => setTimeout(resolve, 500));
+        setContactSending(false);
+        return;
+      }
+
       const { error: inquiryError } = await supabase.from('housing_inquiries').insert({
         listing_id: listing.id,
         user_id: user.id,

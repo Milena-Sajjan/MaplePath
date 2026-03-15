@@ -1,5 +1,6 @@
 import { create } from 'zustand'
-import { supabase } from '../lib/supabase'
+import { supabase, isDemoMode } from '../lib/supabase'
+import { demoNotifications } from '../lib/demoData'
 import type { Database } from '../lib/database.types'
 
 type Notification = Database['public']['Tables']['notifications']['Row']
@@ -19,6 +20,15 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
   unreadCount: 0,
   loading: true,
   fetchNotifications: async (userId: string) => {
+    if (isDemoMode) {
+      const unreadCount = demoNotifications.filter(n => !n.read).length
+      set({
+        notifications: demoNotifications as unknown as Notification[],
+        unreadCount,
+        loading: false,
+      })
+      return
+    }
     const { data, error } = await supabase
       .from('notifications')
       .select('*')
@@ -35,11 +45,12 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
     set({ notifications: data ?? [], unreadCount, loading: false })
   },
   markAsRead: async (notificationId: string) => {
-    await supabase
-      .from('notifications')
-      .update({ read: true })
-      .eq('id', notificationId)
-
+    if (!isDemoMode) {
+      await supabase
+        .from('notifications')
+        .update({ read: true })
+        .eq('id', notificationId)
+    }
     const notifications = get().notifications.map(n =>
       n.id === notificationId ? { ...n, read: true } : n
     )
@@ -47,16 +58,20 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
     set({ notifications, unreadCount })
   },
   markAllRead: async (userId: string) => {
-    await supabase
-      .from('notifications')
-      .update({ read: true })
-      .eq('user_id', userId)
-      .eq('read', false)
-
+    if (!isDemoMode) {
+      await supabase
+        .from('notifications')
+        .update({ read: true })
+        .eq('user_id', userId)
+        .eq('read', false)
+    }
     const notifications = get().notifications.map(n => ({ ...n, read: true }))
     set({ notifications, unreadCount: 0 })
   },
   subscribeToNotifications: (userId: string) => {
+    if (isDemoMode) {
+      return () => {} // no-op cleanup
+    }
     const channel = supabase
       .channel('notifications')
       .on(

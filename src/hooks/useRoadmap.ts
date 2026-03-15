@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { supabase } from '../lib/supabase'
+import { supabase, isDemoMode } from '../lib/supabase'
 import { useAuthStore } from '../store/authStore'
 import { useProfileStore } from '../store/profileStore'
 import { roadmapSteps } from '../data/roadmapSteps'
@@ -21,6 +21,28 @@ export function useRoadmap() {
 
   const fetchProgress = useCallback(async () => {
     if (!user) return
+
+    if (isDemoMode) {
+      // In demo mode, show a few steps as completed
+      const demoProgress: RoadmapProgress[] = [
+        {
+          id: 'dp-1', user_id: 'demo-user-001', step_id: 'sin',
+          phase: 1, completed: true, completed_at: '2025-09-20T10:00:00Z', notes: null,
+        },
+        {
+          id: 'dp-2', user_id: 'demo-user-001', step_id: 'bank',
+          phase: 1, completed: true, completed_at: '2025-09-21T14:00:00Z', notes: null,
+        },
+        {
+          id: 'dp-3', user_id: 'demo-user-001', step_id: 'sim',
+          phase: 1, completed: true, completed_at: '2025-09-18T09:00:00Z', notes: null,
+        },
+      ] as unknown as RoadmapProgress[]
+      setProgress(demoProgress)
+      setLoading(false)
+      return
+    }
+
     const { data, error } = await supabase
       .from('roadmap_progress')
       .select('*')
@@ -43,6 +65,32 @@ export function useRoadmap() {
     async (stepId: string, phase: number) => {
       if (!user) return
       const existing = progress.find((p) => p.step_id === stepId)
+
+      if (isDemoMode) {
+        // In demo mode, just toggle locally
+        if (existing) {
+          const completed = !existing.completed
+          setProgress((prev) =>
+            prev.map((p) =>
+              p.id === existing.id
+                ? { ...p, completed, completed_at: completed ? new Date().toISOString() : null }
+                : p
+            )
+          )
+        } else {
+          const newEntry = {
+            id: `dp-${Date.now()}`,
+            user_id: user.id,
+            step_id: stepId,
+            phase,
+            completed: true,
+            completed_at: new Date().toISOString(),
+            notes: null,
+          } as unknown as RoadmapProgress
+          setProgress((prev) => [...prev, newEntry])
+        }
+        return
+      }
 
       if (existing) {
         const completed = !existing.completed

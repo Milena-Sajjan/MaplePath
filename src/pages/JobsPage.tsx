@@ -5,7 +5,8 @@ import {
   Search, Briefcase, MapPin, Clock, DollarSign, ExternalLink,
   Bookmark, BookmarkCheck, Plus, X, Globe, Filter,
 } from 'lucide-react'
-import { supabase } from '../lib/supabase'
+import { supabase, isDemoMode } from '../lib/supabase'
+import { demoJobs } from '../lib/demoData'
 import { useAuthStore } from '../store/authStore'
 import { useProfileStore } from '../store/profileStore'
 import { formatTimeAgo } from '../lib/utils'
@@ -56,6 +57,12 @@ export default function JobsPage() {
   const [submitting, setSubmitting] = useState(false)
 
   const fetchJobs = useCallback(async () => {
+    if (isDemoMode) {
+      setJobs(demoJobs as JobListing[])
+      setLoading(false)
+      return
+    }
+
     let query = supabase
       .from('job_listings')
       .select('*')
@@ -111,8 +118,37 @@ export default function JobsPage() {
   }
 
   const handlePostJob = async () => {
-    if (!user || !newJob.title.trim()) return
+    if (!newJob.title.trim()) return
     setSubmitting(true)
+
+    if (isDemoMode) {
+      const demoJob: JobListing = {
+        id: `demo-${Date.now()}`,
+        title: newJob.title,
+        company: newJob.company,
+        description: newJob.description,
+        requirements: newJob.requirements || null,
+        job_type: newJob.job_type,
+        salary_range: newJob.salary_range || null,
+        location: newJob.location || null,
+        city: newJob.city || null,
+        remote: newJob.remote,
+        status_types: null,
+        languages_needed: null,
+        application_url: newJob.application_url || null,
+        contact_email: null,
+        deadline: newJob.deadline || null,
+        is_active: true,
+        views: 0,
+        created_at: new Date().toISOString(),
+      }
+      setJobs((prev) => [demoJob, ...prev])
+      setShowPostJob(false)
+      setSubmitting(false)
+      return
+    }
+
+    if (!user) return
     const { error } = await supabase.from('job_listings').insert({
       posted_by: user.id,
       title: newJob.title,

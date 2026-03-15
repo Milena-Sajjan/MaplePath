@@ -24,7 +24,8 @@ import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth'
 import { useRoadmap } from '../hooks/useRoadmap'
 import { useNotifications } from '../hooks/useNotifications'
-import { supabase } from '../lib/supabase'
+import { supabase, isDemoMode } from '../lib/supabase'
+import { demoForumPosts, demoJobs, demoHousing } from '../lib/demoData'
 import { getGreeting, getDaysSince, formatTimeAgo } from '../lib/utils'
 import type { Database } from '../lib/database.types'
 
@@ -100,6 +101,16 @@ export default function DashboardPage() {
 
   useEffect(() => {
     async function fetchDashboardData() {
+      if (isDemoMode) {
+        setForumPosts(demoForumPosts as unknown as ForumPost[])
+        setJobCount(demoJobs.length)
+        setLatestJobs(demoJobs.slice(0, 2) as unknown as JobListing[])
+        setLatestHousing(demoHousing as unknown as HousingListing[])
+        setWeeklyPostCount(demoForumPosts.length)
+        setDataLoading(false)
+        return
+      }
+
       const weekStart = startOfWeek(new Date(), { weekStartsOn: 1 }).toISOString()
 
       const [

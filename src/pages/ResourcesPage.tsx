@@ -7,7 +7,8 @@ import {
   Heart, Scale, Bus, GraduationCap, Landmark, Building2, Users,
   Stethoscope, Brain, Briefcase,
 } from 'lucide-react'
-import { supabase } from '../lib/supabase'
+import { supabase, isDemoMode } from '../lib/supabase'
+import { demoResources } from '../lib/demoData'
 import { useAuthStore } from '../store/authStore'
 
 const resourceCategories = [
@@ -55,6 +56,15 @@ export default function ResourcesPage() {
   const [submitting, setSubmitting] = useState(false)
 
   const fetchResources = useCallback(async () => {
+    if (isDemoMode) {
+      let filtered = demoResources as unknown as Resource[]
+      if (category !== 'all') filtered = filtered.filter((r) => r.category === category)
+      if (cityFilter) filtered = filtered.filter((r) => r.city === cityFilter)
+      setResources(filtered)
+      setLoading(false)
+      return
+    }
+
     let query = supabase.from('resources').select('*').eq('verified', true).order('title')
     if (category !== 'all') query = query.eq('category', category)
     if (cityFilter) query = query.eq('city', cityFilter)
@@ -75,6 +85,15 @@ export default function ResourcesPage() {
   const handleSuggest = async () => {
     if (!user || !suggestion.title.trim()) return
     setSubmitting(true)
+
+    if (isDemoMode) {
+      setShowSuggest(false)
+      setSuggestion({ title: '', category: 'community', description: '', url: '', phone: '', city: '' })
+      setSubmitting(false)
+      alert('Thank you! Your resource suggestion has been submitted for review.')
+      return
+    }
+
     await supabase.from('resources').insert({
       title: suggestion.title,
       category: suggestion.category,

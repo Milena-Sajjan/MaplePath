@@ -5,7 +5,8 @@ import { motion } from 'framer-motion'
 import {
   ThumbsUp, MessageCircle, ArrowLeft, Share2, Bot, Check, Send,
 } from 'lucide-react'
-import { supabase } from '../lib/supabase'
+import { supabase, isDemoMode } from '../lib/supabase'
+import { demoForumPosts } from '../lib/demoData'
 import { useAuthStore } from '../store/authStore'
 import { formatTimeAgo } from '../lib/utils'
 
@@ -47,6 +48,15 @@ export default function ForumPostPage() {
 
   const fetchData = useCallback(async () => {
     if (!id) return
+
+    if (isDemoMode) {
+      const demoPost = demoForumPosts.find((p) => p.id === id)
+      if (demoPost) setPost(demoPost as unknown as Post)
+      setReplies([])
+      setLoading(false)
+      return
+    }
+
     const [postRes, repliesRes] = await Promise.all([
       supabase.from('forum_posts').select('*, profiles(full_name, avatar_url)').eq('id', id).single(),
       supabase.from('forum_replies').select('*, profiles(full_name, avatar_url)').eq('post_id', id).order('created_at', { ascending: true }),
@@ -63,20 +73,42 @@ export default function ForumPostPage() {
   const handleUpvote = async () => {
     if (!post || hasUpvoted) return
     const newUpvotes = post.upvotes + 1
-    await supabase.from('forum_posts').update({ upvotes: newUpvotes }).eq('id', post.id)
+    if (!isDemoMode) {
+      await supabase.from('forum_posts').update({ upvotes: newUpvotes }).eq('id', post.id)
+    }
     setPost({ ...post, upvotes: newUpvotes })
     setHasUpvoted(true)
   }
 
   const handleReplyUpvote = async (replyId: string, currentUpvotes: number) => {
     const newUpvotes = currentUpvotes + 1
-    await supabase.from('forum_replies').update({ upvotes: newUpvotes }).eq('id', replyId)
+    if (!isDemoMode) {
+      await supabase.from('forum_replies').update({ upvotes: newUpvotes }).eq('id', replyId)
+    }
     setReplies((prev) => prev.map((r) => r.id === replyId ? { ...r, upvotes: newUpvotes } : r))
   }
 
   const handleSubmitReply = async () => {
     if (!user || !post || !replyContent.trim()) return
     setSubmitting(true)
+
+    if (isDemoMode) {
+      const demoReply: Reply = {
+        id: `demo-reply-${Date.now()}`,
+        content: replyContent,
+        upvotes: 0,
+        is_answer: false,
+        created_at: new Date().toISOString(),
+        user_id: user.id,
+        profiles: { full_name: 'Demo User', avatar_url: null },
+      }
+      setReplies((prev) => [...prev, demoReply])
+      setPost({ ...post, reply_count: post.reply_count + 1 })
+      setReplyContent('')
+      setSubmitting(false)
+      return
+    }
+
     const { error } = await supabase.from('forum_replies').insert({
       post_id: post.id,
       user_id: user.id,

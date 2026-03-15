@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Send, Trash2, Bot, User, ExternalLink } from 'lucide-react';
-import { supabase } from '../lib/supabase';
+import { supabase, isDemoMode } from '../lib/supabase';
 import { useAuthStore } from '../store/authStore';
 import { useProfileStore } from '../store/profileStore';
 import { useSearchParams } from 'react-router-dom';
@@ -48,6 +48,12 @@ export default function SettlerWizPage() {
   }, [messages, isTyping, scrollToBottom]);
 
   useEffect(() => {
+    if (isDemoMode) {
+      setMessages([]);
+      setIsLoading(false);
+      return;
+    }
+
     if (!user) return;
 
     const loadMessages = async () => {
@@ -92,7 +98,8 @@ export default function SettlerWizPage() {
 
   const sendMessage = useCallback(
     async (text: string) => {
-      if (!text.trim() || !user || isTyping) return;
+      if (!text.trim() || isTyping) return;
+      if (!isDemoMode && !user) return;
 
       setError(null);
       const userMessage = text.trim();
@@ -109,53 +116,70 @@ export default function SettlerWizPage() {
       setIsTyping(true);
 
       try {
-        const { error: insertError } = await supabase.from('chat_messages').insert({
-          id: userMsg.id,
-          user_id: user.id,
-          role: 'user',
-          content: userMessage,
-          created_at: userMsg.created_at,
-        });
+        if (isDemoMode) {
+          // In demo mode, return a mock AI response instead of calling the edge function
+          await new Promise((resolve) => setTimeout(resolve, 800));
 
-        if (insertError) throw insertError;
+          const demoReply =
+            "Hi! I'm SettlerWiz \u{1F989}, your friendly Canadian settlement assistant. In demo mode, I can't connect to the AI backend, but here are some helpful tips:\n\n**Getting Started in Canada:**\n1. Apply for your SIN at Service Canada\n2. Open a bank account (TD, RBC, and Scotiabank have great newcomer packages)\n3. Apply for OHIP health coverage\n\nTo enable full AI responses, connect MaplePath to Supabase and configure your OpenAI API key.\n\n[IRCC] [Service Canada]";
 
-        let queryContent = userMessage;
-        if (profile?.preferred_language && profile.preferred_language !== 'en') {
-          queryContent = `Please respond in ${profile.preferred_language}: ${userMessage}`;
+          const assistantMsg: ChatMessage = {
+            id: crypto.randomUUID(),
+            role: 'assistant',
+            content: demoReply,
+            created_at: new Date().toISOString(),
+          };
+
+          setMessages((prev) => [...prev, assistantMsg]);
+        } else {
+          const { error: insertError } = await supabase.from('chat_messages').insert({
+            id: userMsg.id,
+            user_id: user!.id,
+            role: 'user',
+            content: userMessage,
+            created_at: userMsg.created_at,
+          });
+
+          if (insertError) throw insertError;
+
+          let queryContent = userMessage;
+          if (profile?.preferred_language && profile.preferred_language !== 'en') {
+            queryContent = `Please respond in ${profile.preferred_language}: ${userMessage}`;
+          }
+
+          const { data: fnData, error: fnError } = await supabase.functions.invoke('settlerWiz', {
+            body: {
+              messages: [...messages, userMsg].map((m) => ({ role: m.role, content: m.content })),
+              userProfile: profile,
+              query: queryContent,
+            },
+          });
+
+          if (fnError) throw fnError;
+
+          const { reply, sources } = fnData as { reply: string; sources?: string[] };
+
+          const assistantMsg: ChatMessage = {
+            id: crypto.randomUUID(),
+            role: 'assistant',
+            content: reply,
+            sources: sources && sources.length > 0 ? sources : undefined,
+            created_at: new Date().toISOString(),
+          };
+
+          const { error: assistantInsertError } = await supabase.from('chat_messages').insert({
+            id: assistantMsg.id,
+            user_id: user!.id,
+            role: 'assistant',
+            content: assistantMsg.content,
+            sources: assistantMsg.sources,
+            created_at: assistantMsg.created_at,
+          });
+
+          if (assistantInsertError) throw assistantInsertError;
+
+          setMessages((prev) => [...prev, assistantMsg]);
         }
-
-        const { data: fnData, error: fnError } = await supabase.functions.invoke('settlerWiz', {
-          body: {
-            messages: [...messages, userMsg].map((m) => ({ role: m.role, content: m.content })),
-            userProfile: profile,
-            query: queryContent,
-          },
-        });
-
-        if (fnError) throw fnError;
-
-        const { reply, sources } = fnData as { reply: string; sources?: string[] };
-
-        const assistantMsg: ChatMessage = {
-          id: crypto.randomUUID(),
-          role: 'assistant',
-          content: reply,
-          sources: sources && sources.length > 0 ? sources : undefined,
-          created_at: new Date().toISOString(),
-        };
-
-        const { error: assistantInsertError } = await supabase.from('chat_messages').insert({
-          id: assistantMsg.id,
-          user_id: user.id,
-          role: 'assistant',
-          content: assistantMsg.content,
-          sources: assistantMsg.sources,
-          created_at: assistantMsg.created_at,
-        });
-
-        if (assistantInsertError) throw assistantInsertError;
-
-        setMessages((prev) => [...prev, assistantMsg]);
       } catch (err: any) {
         setError(err.message || t('settlerWiz.errorSending', 'Failed to send message. Please try again.'));
       } finally {

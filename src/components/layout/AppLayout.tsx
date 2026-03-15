@@ -3,6 +3,7 @@ import { Outlet, useLocation } from 'react-router-dom'
 import { AnimatePresence, motion } from 'framer-motion'
 import { useAuthStore } from '../../store/authStore'
 import { useProfileStore } from '../../store/profileStore'
+import { isDemoMode } from '../../lib/supabase'
 import { ToastProvider, ToastViewport } from '../ui/Toast'
 import Sidebar from './Sidebar'
 import TopNav from './TopNav'
@@ -41,6 +42,13 @@ export default function AppLayout() {
   return (
     <ToastProvider>
       <div className="min-h-screen bg-gray-50">
+        {/* Demo mode banner */}
+        {isDemoMode && (
+          <div className="fixed top-0 left-0 right-0 z-[100] bg-gradient-to-r from-amber-500 to-orange-500 text-white text-center py-1.5 text-xs font-medium shadow-sm">
+            🍁 Demo Mode — Showing sample data. Connect Supabase for full functionality.
+          </div>
+        )}
+
         {/* Desktop sidebar */}
         <Sidebar />
 
@@ -72,7 +80,7 @@ export default function AppLayout() {
         </AnimatePresence>
 
         {/* Main content area */}
-        <div className="md:pl-64">
+        <div className={`md:pl-64 ${isDemoMode ? 'pt-8' : ''}`}>
           <TopNav onToggleSidebar={() => setMobileSidebarOpen(!mobileSidebarOpen)} />
 
           <main className="pb-20 md:pb-0">

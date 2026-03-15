@@ -10,7 +10,8 @@ import { PieChart, Pie, Cell, ResponsiveContainer, Legend } from 'recharts'
 import { useAuth } from '../hooks/useAuth'
 import { useProfile } from '../hooks/useProfile'
 import { useRoadmap } from '../hooks/useRoadmap'
-import { supabase } from '../lib/supabase'
+import { supabase, isDemoMode } from '../lib/supabase'
+import { demoProfile } from '../lib/demoData'
 import { useAuthStore } from '../store/authStore'
 import { cn } from '../lib/utils'
 
@@ -24,13 +25,22 @@ const statusLabels: Record<string, string> = {
 export default function ProfilePage() {
   const { t, i18n } = useTranslation()
   const { user } = useAuth()
-  const { profile, update, uploadAvatar } = useProfile()
+  const { profile: liveProfile, update, uploadAvatar } = useProfile()
   const { getPhaseProgress, completedCount, totalCount } = useRoadmap()
   const { signOut } = useAuthStore()
   const [editing, setEditing] = useState(false)
   const [editData, setEditData] = useState<any>({})
   const [saving, setSaving] = useState(false)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+  const [demoToast, setDemoToast] = useState<string | null>(null)
+  const [demoProfileState, setDemoProfileState] = useState(demoProfile)
+
+  const profile = isDemoMode ? demoProfileState : liveProfile
+
+  const showDemoToast = (msg: string) => {
+    setDemoToast(msg)
+    setTimeout(() => setDemoToast(null), 3000)
+  }
 
   useEffect(() => {
     if (profile) {
@@ -52,6 +62,12 @@ export default function ProfilePage() {
 
   const handleSave = async () => {
     setSaving(true)
+    if (isDemoMode) {
+      setDemoProfileState((prev) => ({ ...prev, ...editData }))
+      setEditing(false)
+      setSaving(false)
+      return
+    }
     await update(editData)
     setEditing(false)
     setSaving(false)
@@ -60,6 +76,10 @@ export default function ProfilePage() {
   const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (file) {
+      if (isDemoMode) {
+        showDemoToast('Avatar upload requires Supabase')
+        return
+      }
       await uploadAvatar(file)
     }
   }
@@ -75,6 +95,11 @@ export default function ProfilePage() {
   }
 
   const handleDeleteAccount = async () => {
+    if (isDemoMode) {
+      showDemoToast('Account deletion not available in demo mode')
+      setShowDeleteConfirm(false)
+      return
+    }
     await signOut()
   }
 
@@ -142,6 +167,16 @@ export default function ProfilePage() {
 
   return (
     <div className="p-4 md:p-6 max-w-3xl mx-auto space-y-6">
+      {demoToast && (
+        <motion.div
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0 }}
+          className="fixed top-4 right-4 z-50 bg-amber-50 border border-amber-200 text-amber-900 px-4 py-3 rounded-lg shadow-lg text-sm"
+        >
+          {demoToast}
+        </motion.div>
+      )}
       <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
         <div className="flex items-start justify-between">
           <div className="flex items-center gap-4">

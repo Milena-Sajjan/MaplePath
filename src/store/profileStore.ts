@@ -1,5 +1,6 @@
 import { create } from 'zustand'
-import { supabase } from '../lib/supabase'
+import { supabase, isDemoMode } from '../lib/supabase'
+import { demoProfile } from '../lib/demoData'
 import type { Database } from '../lib/database.types'
 
 type Profile = Database['public']['Tables']['profiles']['Row']
@@ -15,6 +16,10 @@ export const useProfileStore = create<ProfileState>((set) => ({
   profile: null,
   loading: true,
   fetchProfile: async (userId: string) => {
+    if (isDemoMode) {
+      set({ profile: demoProfile as unknown as Profile, loading: false })
+      return
+    }
     set({ loading: true })
     const { data, error } = await supabase
       .from('profiles')
@@ -30,6 +35,12 @@ export const useProfileStore = create<ProfileState>((set) => ({
     set({ profile: data, loading: false })
   },
   updateProfile: async (userId: string, updates: Partial<Profile>) => {
+    if (isDemoMode) {
+      set((state) => ({
+        profile: state.profile ? { ...state.profile, ...updates } : null,
+      }))
+      return
+    }
     const { data, error } = await supabase
       .from('profiles')
       .update({ ...updates, updated_at: new Date().toISOString() })

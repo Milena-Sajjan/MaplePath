@@ -5,7 +5,8 @@ import { motion, AnimatePresence } from 'framer-motion'
 import {
   MessageCircle, ThumbsUp, Plus, X, Filter, Clock, TrendingUp, MessageSquare,
 } from 'lucide-react'
-import { supabase } from '../lib/supabase'
+import { supabase, isDemoMode } from '../lib/supabase'
+import { demoForumPosts } from '../lib/demoData'
 import { useAuthStore } from '../store/authStore'
 import { formatTimeAgo } from '../lib/utils'
 
@@ -42,6 +43,19 @@ export default function ForumPage() {
   const [submitting, setSubmitting] = useState(false)
 
   const fetchPosts = useCallback(async () => {
+    if (isDemoMode) {
+      let filtered = demoForumPosts as unknown as ForumPost[]
+      if (category !== 'all') {
+        filtered = filtered.filter((p) => p.category === category)
+      }
+      if (sort === 'latest') filtered = [...filtered].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+      else if (sort === 'upvotes') filtered = [...filtered].sort((a, b) => b.upvotes - a.upvotes)
+      else if (sort === 'replies') filtered = [...filtered].sort((a, b) => b.reply_count - a.reply_count)
+      setPosts(filtered)
+      setLoading(false)
+      return
+    }
+
     let query = supabase
       .from('forum_posts')
       .select('*, profiles(full_name, avatar_url, country_of_origin)')
@@ -64,6 +78,8 @@ export default function ForumPage() {
   }, [fetchPosts])
 
   useEffect(() => {
+    if (isDemoMode) return
+
     const channel = supabase
       .channel('forum-realtime')
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'forum_posts' }, (payload) => {
@@ -77,6 +93,28 @@ export default function ForumPage() {
   const handleSubmitPost = async () => {
     if (!user || !newPost.title.trim() || !newPost.content.trim()) return
     setSubmitting(true)
+
+    if (isDemoMode) {
+      const demoPost: ForumPost = {
+        id: `demo-${Date.now()}`,
+        user_id: user.id,
+        title: newPost.title,
+        content: newPost.content,
+        category: newPost.category,
+        tags: newPost.tags.split(',').map((t) => t.trim()).filter(Boolean),
+        city: newPost.city || null,
+        upvotes: 0,
+        reply_count: 0,
+        created_at: new Date().toISOString(),
+        profiles: { full_name: 'Demo User', avatar_url: null, country_of_origin: null },
+      }
+      setPosts((prev) => [demoPost, ...prev])
+      setShowNewPost(false)
+      setNewPost({ title: '', content: '', category: 'general', tags: '', city: '' })
+      setSubmitting(false)
+      return
+    }
+
     const { error } = await supabase.from('forum_posts').insert({
       user_id: user.id,
       title: newPost.title,
