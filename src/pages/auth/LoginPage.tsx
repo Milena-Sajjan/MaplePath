@@ -61,11 +61,11 @@ export default function LoginPage() {
               key={i}
               className="absolute text-white"
               style={{
-                left: `${Math.random() * 100}%`,
-                top: `${Math.random() * 100}%`,
-                width: `${30 + Math.random() * 40}px`,
-                opacity: 0.3 + Math.random() * 0.4,
-                transform: `rotate(${Math.random() * 360}deg)`,
+                left: `${(i * 17 + 5) % 100}%`,
+                top: `${(i * 23 + 10) % 100}%`,
+                width: `${30 + (i % 5) * 10}px`,
+                opacity: 0.3 + (i % 4) * 0.1,
+                transform: `rotate(${i * 37}deg)`,
               }}
               viewBox="0 0 100 100"
               fill="currentColor"
@@ -96,7 +96,7 @@ export default function LoginPage() {
           </div>
 
           <h2 className="text-2xl font-semibold text-slate mb-1">{t('auth.welcomeBack')}</h2>
-          <p className="text-gray-500 mb-8">{t('auth.login')} to your account</p>
+          <p className="text-gray-500 mb-8">Sign in to continue your settlement journey</p>
 
           {error && (
             <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
@@ -171,12 +171,18 @@ export default function LoginPage() {
             {t('auth.continueWithGoogle')}
           </button>
 
-          <p className="text-center text-sm text-gray-500 mt-6">
-            {t('auth.noAccount')}{' '}
-            <Link to="/signup" className="text-maple font-medium hover:underline">
-              {t('auth.signup')}
+          <div className="mt-6 p-4 bg-forest-pale border border-forest/20 rounded-xl text-center">
+            <p className="text-sm text-forest font-medium mb-2">New to Canada? 🍁</p>
+            <p className="text-xs text-gray-600 mb-3">
+              Sign up to get a personalized settlement roadmap based on your immigration status
+            </p>
+            <Link
+              to="/signup"
+              className="inline-flex items-center gap-1 bg-forest text-white px-5 py-2 rounded-lg text-sm font-medium hover:bg-forest-mid transition"
+            >
+              Get Started — It&apos;s Free
             </Link>
-          </p>
+          </div>
         </motion.div>
       </div>
     </div>
